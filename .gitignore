@@ -1,0 +1,7 @@
+build/
+*.so
+__pycache__/
+*.pyc
+*.egg-info/
+vocabulary/ORBvoc.txt
+results/
