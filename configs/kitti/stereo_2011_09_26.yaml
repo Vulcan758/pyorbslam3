@@ -1,0 +1,63 @@
+%YAML:1.0
+# KITTI raw 2011_09_26 drives (= odometry sequence 03 calibration), rectified
+# grayscale pair image_00 / image_01 (1242x375).
+#
+# Upstream ships this as Camera.type "Rectified" + Stereo.b, but that code path
+# dereferences an uninitialised Camera2 pointer in Settings' print operator and
+# segfaults. Expressing the already-rectified pair as two identical PinHole
+# cameras with a pure +x baseline is geometrically equivalent (ORB-SLAM3's own
+# rectification resolves to an identity remap) and avoids the crash.
+File.version: "1.0"
+
+Camera.type: "PinHole"
+
+Camera1.fx: 721.5377
+Camera1.fy: 721.5377
+Camera1.cx: 609.5593
+Camera1.cy: 172.854
+Camera1.k1: 0.0
+Camera1.k2: 0.0
+Camera1.p1: 0.0
+Camera1.p2: 0.0
+
+Camera2.fx: 721.5377
+Camera2.fy: 721.5377
+Camera2.cx: 609.5593
+Camera2.cy: 172.854
+Camera2.k1: 0.0
+Camera2.k2: 0.0
+Camera2.p1: 0.0
+Camera2.p2: 0.0
+
+Camera.width: 1242
+Camera.height: 375
+Camera.fps: 10
+Camera.RGB: 1
+
+# Baseline 0.53715 m along +x (from P_rect_01 of calib_cam_to_cam.txt).
+Stereo.ThDepth: 40.0
+Stereo.T_c1_c2: !!opencv-matrix
+  rows: 4
+  cols: 4
+  dt: f
+  data: [1.0, 0.0, 0.0, 0.53715,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+
+ORBextractor.nFeatures: 2000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+Viewer.KeyFrameSize: 0.6
+Viewer.KeyFrameLineWidth: 2.0
+Viewer.GraphLineWidth: 1.0
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.7
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -100.0
+Viewer.ViewpointZ: -0.1
+Viewer.ViewpointF: 2000.0

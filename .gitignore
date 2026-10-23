@@ -4,4 +4,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 vocabulary/ORBvoc.txt
-results/
+results/*
+!results/benchmarks.jsonl
+!results/traj_*.txt
+!results/kf_traj_*.txt

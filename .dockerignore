@@ -1,0 +1,8 @@
+build/
+results/
+vocabulary/
+*.so
+__pycache__/
+*.pyc
+*.egg-info/
+.git/

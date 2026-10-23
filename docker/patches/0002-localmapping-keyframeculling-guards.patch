@@ -1,0 +1,39 @@
+--- a/src/LocalMapping.cc
++++ b/src/LocalMapping.cc
+@@ -973,18 +973,22 @@
+                         for(map<KeyFrame*, tuple<int,int>>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
+                         {
+                             KeyFrame* pKFi = mit->first;
+-                            if(pKFi==pKF)
++                            if(!pKFi || pKFi==pKF || pKFi->isBad())
+                                 continue;
+                             tuple<int,int> indexes = mit->second;
+                             int leftIndex = get<0>(indexes), rightIndex = get<1>(indexes);
+                             int scaleLeveli = -1;
+-                            if(pKFi -> NLeft == -1)
++                            if(pKFi -> NLeft == -1) {
++                                if(leftIndex < 0 || leftIndex >= static_cast<int>(pKFi->mvKeysUn.size()))
++                                    continue;
+                                 scaleLeveli = pKFi->mvKeysUn[leftIndex].octave;
++                            }
+                             else {
+-                                if (leftIndex != -1) {
++                                if (leftIndex != -1 && leftIndex < static_cast<int>(pKFi->mvKeys.size())) {
+                                     scaleLeveli = pKFi->mvKeys[leftIndex].octave;
+                                 }
+-                                if (rightIndex != -1) {
++                                if (rightIndex != -1 && rightIndex - pKFi->NLeft >= 0 &&
++                                    rightIndex - pKFi->NLeft < static_cast<int>(pKFi->mvKeysRight.size())) {
+                                     int rightLevel = pKFi->mvKeysRight[rightIndex - pKFi->NLeft].octave;
+                                     scaleLeveli = (scaleLeveli == -1 || scaleLeveli > rightLevel) ? rightLevel
+                                                                                                   : scaleLeveli;
+@@ -1017,7 +1021,8 @@
+                 if(pKF->mnId>(mpCurrentKeyFrame->mnId-2))
+                     continue;
+ 
+-                if(pKF->mPrevKF && pKF->mNextKF)
++                if(pKF->mPrevKF && pKF->mNextKF && pKF->mpImuPreintegrated &&
++                   pKF->mNextKF->mpImuPreintegrated)
+                 {
+                     const float t = pKF->mNextKF->mTimeStamp-pKF->mPrevKF->mTimeStamp;
+ 
