@@ -125,6 +125,10 @@ sequence vary by a few percent in tracked frames and ATE.
   The Python layer adds no measurable overhead: the median track-call time is
   the ORB-SLAM3 tracking thread's own frame time.
 
+Where a mode was run twice, `results/` holds the trajectory of the later run
+(the `_run2` files for the two repeats that were run into a separate folder,
+otherwise the file was overwritten); the JSONL keeps both sets of metrics.
+
 ## Not covered here
 
 * Real-camera results (ZED 2i, RealSense D435i) live in the `orbulation` ROS 2
