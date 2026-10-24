@@ -5,7 +5,7 @@ Quick start::
     import pyorbslam3 as pos
 
     slam = pos.Slam(
-        vocab_file="vocabulary/ORBvoc.txt",
+        vocab_file=pos.vocabulary_path(),   # downloads ORBvoc.txt once
         settings_file="configs/tumvi/mono_inertial.yaml",
         sensor=pos.Sensor.IMU_MONOCULAR,
     )
@@ -19,5 +19,6 @@ Quick start::
 
 from ._core import Sensor, TrackingState, TrackResult
 from .slam import Slam, ImuMeasurement
+from .vocab import vocabulary_path
 
-__all__ = ["Slam", "Sensor", "TrackingState", "TrackResult", "ImuMeasurement"]
+__all__ = ["Slam", "Sensor", "TrackingState", "TrackResult", "ImuMeasurement", "vocabulary_path"]

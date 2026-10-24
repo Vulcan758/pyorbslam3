@@ -8,3 +8,4 @@ results/*
 !results/benchmarks.jsonl
 !results/traj_*.txt
 !results/kf_traj_*.txt
+dist/

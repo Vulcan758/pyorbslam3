@@ -51,13 +51,11 @@ RUN git init -q /opt/ORB_SLAM3 && cd /opt/ORB_SLAM3 \
 RUN cmake -S /opt/ORB_SLAM3 -B /opt/ORB_SLAM3/build -DCMAKE_BUILD_TYPE=Release \
     && cmake --build /opt/ORB_SLAM3/build -j${JOBS}
 
-# ---- pyorbslam3 ------------------------------------------------------------
+# ---- pyorbslam3 (PEP 517 build against the tree above) ---------------------
 COPY . /src/pyorbslam3
 RUN cd /src/pyorbslam3 \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DORBSLAM3_ROOT=/opt/ORB_SLAM3 \
-         -Dpybind11_DIR="$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" \
-    && cmake --build build -j${JOBS} \
-    && pip3 install --no-cache-dir --no-deps --target /opt/pyinstall .
+    && ORBSLAM3_ROOT=/opt/ORB_SLAM3 pip3 install --no-cache-dir --no-deps --target /opt/pyinstall . \
+    && python3 -c "import sys; sys.path.insert(0, '/opt/pyinstall'); import pyorbslam3"
 
 # ---------------------------------------------------------------------------
 FROM ubuntu:${UBUNTU}

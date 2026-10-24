@@ -1,0 +1,32 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pyorbslam3"
+version = "0.1.0"
+description = "Python bindings for ORB-SLAM3: monocular, stereo, RGB-D, with and without IMU"
+readme = "README.md"
+license = { text = "GPL-3.0-only" }
+requires-python = ">=3.8"
+dependencies = ["numpy"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+[project.urls]
+Homepage = "https://github.com/Vulcan758/pyorbslam3"
+Benchmarks = "https://github.com/Vulcan758/pyorbslam3/blob/main/BENCHMARKS.md"
+
+[tool.scikit-build]
+cmake.version = ">=3.25"
+cmake.build-type = "Release"
+build.verbose = true
+logging.level = "INFO"
+# keep the (long) dependency build between pip invocations
+build-dir = "build/pip-{wheel_tag}"
+wheel.packages = ["pyorbslam3"]
+sdist.exclude = ["build/", "results/", "vocabulary/", "*.so", "__pycache__/"]

@@ -39,8 +39,9 @@ import pyorbslam3 as pos  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.abspath(os.path.join(HERE, ".."))
-DEFAULT_VOCAB = os.environ.get(
-    "PYORBSLAM3_VOCAB", os.path.join(PKG_ROOT, "vocabulary", "ORBvoc.txt")
+_local_vocab = os.path.join(PKG_ROOT, "vocabulary", "ORBvoc.txt")
+DEFAULT_VOCAB = os.environ.get("PYORBSLAM3_VOCAB") or (
+    _local_vocab if os.path.isfile(_local_vocab) else None  # None -> pos.vocabulary_path()
 )
 
 # mode -> (sensor, uses_imu, uses_stereo, uses_depth)
@@ -306,7 +307,8 @@ def main():
     n = len(stamps) if args.max_frames <= 0 else min(args.max_frames, len(stamps))
     print(f"[benchmark] {args.dataset}/{seq} mode={args.mode} frames={n} settings={settings}")
 
-    slam = pos.Slam(args.vocab, settings, sensor, use_viewer=args.viewer)
+    vocab = args.vocab or pos.vocabulary_path()
+    slam = pos.Slam(vocab, settings, sensor, use_viewer=args.viewer)
     states, track_times = [], []
     t_prev = -np.inf
     imu_init_frame = None

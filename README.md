@@ -39,10 +39,61 @@ ROS 2 package, which runs them live on a ZED 2i and an Intel RealSense D435i.
   call. The Docker build also carries a small defensive patch for a race in
   `LocalMapping::KeyFrameCulling()` that could segfault long inertial runs.
 
-## Quick start with Docker
+## Installation
+
+### pip (builds everything from source)
 
 ```bash
-docker build -t pyorbslam3 .            # builds Pangolin + ORB-SLAM3 + bindings (30–60 min)
+# Ubuntu 22.04 / Debian 12 build prerequisites
+sudo apt install build-essential git pkg-config python3-dev python3-pip \
+    libopencv-dev libeigen3-dev libboost-serialization-dev libssl-dev \
+    libglew-dev libgl1-mesa-dev libegl1-mesa-dev libglu1-mesa-dev \
+    libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev
+
+pip install git+https://github.com/Vulcan758/pyorbslam3      # or: pip install . in a checkout
+```
+
+pip downloads and compiles Pangolin 0.9 and ORB-SLAM3 (pinned commit plus the
+two patches in `docker/patches/`) before building the bindings, so the first
+install takes 30–60 minutes. Two parallel compile jobs are used by default
+because some ORB-SLAM3 files need about 2 GB of RAM each; raise it with
+`PYORBSLAM3_JOBS=4 pip install …` on a machine with memory to spare. CMake ≥ 3.25
+and Ninja are fetched automatically if the system ones are too old. The build
+directory is kept under `build/` in a checkout, so a failed or interrupted
+install resumes instead of starting over.
+
+If you already have an ORB-SLAM3 tree built as static `-fPIC` libraries, skip
+the dependency build:
+
+```bash
+ORBSLAM3_ROOT=/path/to/ORB_SLAM3 pip install .     # expects <root>/build/libORB_SLAM3.a
+```
+
+### Prebuilt wheel (Ubuntu 22.04, Python 3.10, x86-64)
+
+A wheel built against Ubuntu 22.04's OpenCV is attached to each
+[GitHub release](https://github.com/Vulcan758/pyorbslam3/releases). It bundles
+Boost, GLEW, OpenSSL and the Wayland client libraries and needs only the
+distribution's OpenCV and GL runtime:
+
+```bash
+sudo apt install python3-opencv libgl1 libglx0 libopengl0 libegl1
+pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.0/pyorbslam3-0.1.0-cp310-cp310-manylinux_2_34_x86_64.manylinux_2_35_x86_64.whl
+```
+
+Other Python versions or distributions: use the pip source build above.
+
+### Vocabulary
+
+The 139 MB ORB vocabulary is not part of the package. `pyorbslam3.vocabulary_path()`
+returns a local copy, downloading `ORBvoc.txt.tar.gz` from the ORB-SLAM3
+repository once into `~/.cache/pyorbslam3/` (override the location with
+`PYORBSLAM3_CACHE`, or point `PYORBSLAM3_VOCAB` at an existing file).
+
+### Docker
+
+```bash
+docker build -t pyorbslam3 .            # Pangolin + ORB-SLAM3 + bindings, 30–60 min
 docker run --rm -it -v /path/to/datasets:/data pyorbslam3 bash
 # inside the container:
 python3 examples/benchmark.py --dataset tumvi --root /data/dataset-room1_512_16 --mode stereo-imu
@@ -50,9 +101,8 @@ python3 examples/benchmark.py --dataset tumvi --root /data/dataset-room1_512_16 
 
 The image is Ubuntu 22.04 with Python 3.10 and contains the bindings, the ORB
 vocabulary (`$PYORBSLAM3_VOCAB`), the dataset configs and the example scripts;
-it weighs about 1 GB. `JOBS` (default 3) caps build parallelism because a few
-ORB-SLAM3 translation units need about 2 GB of RAM each to compile: use
-`--build-arg JOBS=2` on an 8 GB machine, more on a large one.
+it weighs about 1 GB. `JOBS` (default 3) caps build parallelism for the same
+reason as above: use `--build-arg JOBS=2` on an 8 GB machine.
 
 To use your own code against the image, mount it and import `pyorbslam3`:
 
@@ -68,27 +118,11 @@ docker tag pyorbslam3:latest <user>/pyorbslam3:latest
 docker push <user>/pyorbslam3:0.1.0 && docker push <user>/pyorbslam3:latest
 ```
 
-## Building natively
+### Building in place (development)
 
-Requirements: Ubuntu 22.04 (or similar), CMake ≥ 3.16, a C++17 compiler, OpenCV
-≥ 4.4, Eigen 3, Boost.Serialization, OpenSSL, Pangolin 0.9 (static, built with
-`CMAKE_POSITION_INDEPENDENT_CODE=ON`), `pybind11` (`pip install pybind11`).
-
-1. Build ORB-SLAM3 as static `-fPIC` libraries. The `Dockerfile` shows the
-   exact recipe: upstream commit `4452a3c4` plus the two patches in
-   `docker/patches/`, built with `cmake -S ORB_SLAM3 -B ORB_SLAM3/build`.
-2. Build and install the bindings:
-
-```bash
-./build.sh -DORBSLAM3_ROOT=/path/to/ORB_SLAM3   # drops _core*.so into pyorbslam3/
-pip install -e .
-curl -L https://github.com/UZ-SLAMLab/ORB_SLAM3/raw/master/Vocabulary/ORBvoc.txt.tar.gz \
-  | tar -xz -C vocabulary/                      # 139 MB, not committed
-```
-
-`ORBSLAM3_ROOT` defaults to `../ORB_SLAM3` if that tree has been built. The
-CMake file also still accepts `-DORBSLAM_DEPS=<_deps dir>` to link against an
-ORB-SLAM-Python style build tree.
+`./build.sh [-DORBSLAM3_ROOT=…]` runs the same CMake project without pip and
+drops `_core*.so` into `pyorbslam3/`, so `pip install -e .` or a plain
+`PYTHONPATH` checkout works while editing the C++ source.
 
 ## Usage
 
@@ -96,7 +130,7 @@ ORB-SLAM-Python style build tree.
 import pyorbslam3 as pos
 
 slam = pos.Slam(
-    vocab_file="vocabulary/ORBvoc.txt",
+    vocab_file=pos.vocabulary_path(),          # cached download of ORBvoc.txt
     settings_file="configs/euroc/stereo_inertial.yaml",
     sensor=pos.Sensor.IMU_STEREO,      # MONOCULAR / STEREO / RGBD / IMU_MONOCULAR / IMU_STEREO / IMU_RGBD
     use_viewer=False,
@@ -176,7 +210,9 @@ Through the `orbulation` ROS 2 package:
 
 ```
 src/orbslam3_pybind.cpp    C++ bindings (single file)
-pyorbslam3/                Python package (+ built _core*.so)
+pyorbslam3/                Python package (slam.py wrapper, vocab.py downloader, built _core*.so)
+pyproject.toml             scikit-build-core build (pip install .)
+cmake/deps/                superbuild that fetches and compiles Pangolin + ORB-SLAM3 for pip
 configs/{tumvi,euroc,kitti,tum_rgbd}/   ORB-SLAM3 settings per dataset and mode
 examples/benchmark.py      multi-dataset runner + ATE evaluation
 examples/make_report.py    renders results/benchmarks.jsonl to Markdown

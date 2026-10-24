@@ -8,24 +8,57 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---------------------------------------------------------------------------
-# Where does ORB-SLAM3 come from?
+# Where does ORB-SLAM3 come from? Three options, tried in this order:
 #
-#  (a) ORBSLAM3_ROOT  — a standalone ORB_SLAM3 source tree that has been built
-#                       in <root>/build (libORB_SLAM3.a + Thirdparty libs), with
-#                       Pangolin discoverable through find_package(Pangolin).
-#                       This is what the Dockerfile uses.
-#  (b) ORBSLAM_DEPS   — legacy: the _deps dir of a PRBonn ORB-SLAM-Python
-#                       build (orb_slam3-src/-build, pangolin-src/-build).
-#
-# (a) is picked when ORBSLAM3_ROOT is given or ../ORB_SLAM3/build exists.
+#  (a) ORBSLAM3_ROOT (+ optional ORBSLAM3_BUILD_DIR, default <root>/build):
+#      a standalone ORB_SLAM3 source tree already built as static libraries,
+#      with Pangolin discoverable through find_package(Pangolin) / Pangolin_DIR.
+#      Also read from the environment, so `ORBSLAM3_ROOT=... pip install .` works.
+#  (b) ORBSLAM_DEPS: legacy — the _deps dir of a PRBonn ORB-SLAM-Python build.
+#  (c) PYORBSLAM3_FETCH_DEPS=ON (automatic when neither of the above exists):
+#      download and compile Pangolin + ORB-SLAM3 (cmake/deps). Slow (30–60 min)
+#      but needs nothing beyond the system packages listed in the README.
 # ---------------------------------------------------------------------------
-set(ORBSLAM3_ROOT "" CACHE PATH "Standalone ORB_SLAM3 source tree (built in <root>/build)")
+set(ORBSLAM3_ROOT "$ENV{ORBSLAM3_ROOT}" CACHE PATH "Standalone ORB_SLAM3 source tree")
+set(ORBSLAM3_BUILD_DIR "" CACHE PATH "Build dir of ORBSLAM3_ROOT (default <root>/build)")
 set(ORBSLAM_DEPS
     "${CMAKE_CURRENT_SOURCE_DIR}/../ORB-SLAM-Python/build/cp310-cp310-linux_x86_64/_deps"
     CACHE PATH "Legacy: _deps dir of an ORB-SLAM-Python build")
+option(PYORBSLAM3_FETCH_DEPS "Download and build Pangolin + ORB-SLAM3" OFF)
+if(DEFINED ENV{PYORBSLAM3_JOBS})
+  set(_default_jobs "$ENV{PYORBSLAM3_JOBS}")
+else()
+  set(_default_jobs 2)
+endif()
+set(PYORBSLAM3_JOBS "${_default_jobs}" CACHE STRING "Parallel jobs for the dependency build")
 
-if(ORBSLAM3_ROOT STREQUAL "" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ORB_SLAM3/build/libORB_SLAM3.a")
+if(ORBSLAM3_ROOT STREQUAL "" AND NOT PYORBSLAM3_FETCH_DEPS
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ORB_SLAM3/build/libORB_SLAM3.a")
   set(ORBSLAM3_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../ORB_SLAM3")
+endif()
+if(ORBSLAM3_ROOT STREQUAL "" AND NOT PYORBSLAM3_FETCH_DEPS
+   AND NOT EXISTS "${ORBSLAM_DEPS}/orb_slam3-build/libORB_SLAM3.a")
+  set(PYORBSLAM3_FETCH_DEPS ON)
+endif()
+
+if(PYORBSLAM3_FETCH_DEPS)
+  set(_deps "${CMAKE_BINARY_DIR}/deps")
+  message(STATUS "pyorbslam3: building Pangolin + ORB-SLAM3 from source in ${_deps} "
+                 "(jobs=${PYORBSLAM3_JOBS}; this takes a while)")
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -S "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps" -B "${_deps}"
+            -DJOBS=${PYORBSLAM3_JOBS}
+    RESULT_VARIABLE _rc)
+  if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "configuring the dependency superbuild failed")
+  endif()
+  execute_process(COMMAND ${CMAKE_COMMAND} --build "${_deps}" RESULT_VARIABLE _rc)
+  if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "building Pangolin / ORB-SLAM3 failed (see output above)")
+  endif()
+  set(ORBSLAM3_ROOT "${_deps}/orbslam3-src")
+  set(ORBSLAM3_BUILD_DIR "${_deps}/orbslam3-build")
+  set(Pangolin_DIR "${_deps}/pangolin-install/lib/cmake/Pangolin" CACHE PATH "" FORCE)
 endif()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
@@ -42,13 +75,15 @@ target_compile_definitions(
                 BOOST_ALL_NO_LIB BOOST_SERIALIZATION_DYN_LINK)
 
 if(NOT ORBSLAM3_ROOT STREQUAL "")
-  # ---- (a) standalone tree ------------------------------------------------
-  set(ORBSLAM3_BUILD "${ORBSLAM3_ROOT}/build")
-  if(NOT EXISTS "${ORBSLAM3_BUILD}/libORB_SLAM3.a")
-    message(FATAL_ERROR "libORB_SLAM3.a not found in ${ORBSLAM3_BUILD}; build ORB_SLAM3 first.")
+  # ---- (a)/(c) standalone tree ---------------------------------------------
+  if(ORBSLAM3_BUILD_DIR STREQUAL "")
+    set(ORBSLAM3_BUILD_DIR "${ORBSLAM3_ROOT}/build")
+  endif()
+  if(NOT EXISTS "${ORBSLAM3_BUILD_DIR}/libORB_SLAM3.a")
+    message(FATAL_ERROR "libORB_SLAM3.a not found in ${ORBSLAM3_BUILD_DIR}; build ORB_SLAM3 first.")
   endif()
   find_package(Pangolin REQUIRED)
-  message(STATUS "pyorbslam3: linking standalone ORB_SLAM3 at ${ORBSLAM3_ROOT}")
+  message(STATUS "pyorbslam3: linking ORB_SLAM3 from ${ORBSLAM3_ROOT} (build ${ORBSLAM3_BUILD_DIR})")
 
   target_include_directories(
     _core SYSTEM
@@ -63,9 +98,9 @@ if(NOT ORBSLAM3_ROOT STREQUAL "")
     _core
     PRIVATE
       -Wl,--start-group
-      "${ORBSLAM3_BUILD}/libORB_SLAM3.a"
-      "${ORBSLAM3_BUILD}/Thirdparty/DBoW2/libDBoW2.a"
-      "${ORBSLAM3_BUILD}/Thirdparty/g2o/libg2o.a"
+      "${ORBSLAM3_BUILD_DIR}/libORB_SLAM3.a"
+      "${ORBSLAM3_BUILD_DIR}/Thirdparty/DBoW2/libDBoW2.a"
+      "${ORBSLAM3_BUILD_DIR}/Thirdparty/g2o/libg2o.a"
       ${Pangolin_LIBRARIES}
       -Wl,--end-group
       Eigen3::Eigen
@@ -78,10 +113,6 @@ else()
   set(ORBSLAM_BUILD "${ORBSLAM_DEPS}/orb_slam3-build")
   set(PANGOLIN_SRC "${ORBSLAM_DEPS}/pangolin-src")
   set(PANGOLIN_BUILD "${ORBSLAM_DEPS}/pangolin-build")
-  if(NOT EXISTS "${ORBSLAM_BUILD}/libORB_SLAM3.a")
-    message(FATAL_ERROR "No ORB-SLAM3 build found. Set -DORBSLAM3_ROOT=<standalone tree> "
-                        "or -DORBSLAM_DEPS=<_deps of an ORB-SLAM-Python build>.")
-  endif()
   message(STATUS "pyorbslam3: linking legacy ORB-SLAM-Python deps at ${ORBSLAM_DEPS}")
 
   file(GLOB PANGOLIN_COMPONENT_INCLUDES "${PANGOLIN_SRC}/components/*/include")
@@ -115,6 +146,11 @@ else()
       wayland-client wayland-egl wayland-cursor xkbcommon rt)
 endif()
 
-# Drop the built module straight into the Python package.
-set_target_properties(_core PROPERTIES
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pyorbslam3")
+if(SKBUILD)
+  # pip / scikit-build-core: the module goes into the wheel's package dir.
+  install(TARGETS _core LIBRARY DESTINATION pyorbslam3)
+else()
+  # ./build.sh: drop the built module straight into the source package.
+  set_target_properties(_core PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pyorbslam3")
+endif()
