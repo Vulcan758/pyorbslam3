@@ -41,6 +41,14 @@ ROS 2 package, which runs them live on a ZED 2i and an Intel RealSense D435i.
 
 ## Installation
 
+Three routes, all verified on 2026-10-24:
+
+| Route | Time | Needs | Verified by |
+|---|---|---|---|
+| `pip install git+https://github.com/Vulcan758/pyorbslam3` | 20–60 min (compiles Pangolin + ORB-SLAM3) | apt build packages below | clean-checkout build, then TUM-VI mono-inertial run, scale 1.006 |
+| `ORBSLAM3_ROOT=/path pip install .` | ~2 min | an existing static ORB-SLAM3 build | same wheel contents as above |
+| prebuilt wheel from the [release](https://github.com/Vulcan758/pyorbslam3/releases/tag/v0.1.0) | seconds | Ubuntu 22.04, Python 3.10, `python3-opencv` | pristine Ubuntu 22.04 container, stereo-inertial run, scale 1.011 |
+
 ### pip (builds everything from source)
 
 ```bash
@@ -83,12 +91,34 @@ pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.0/pyo
 
 Other Python versions or distributions: use the pip source build above.
 
+Known limits of the binary route:
+
+* The wheel is Ubuntu 22.04 / Python 3.10 / x86-64 only, because it links the
+  distribution's OpenCV 4.5.4 shared libraries rather than bundling OpenCV
+  (Ubuntu's OpenCV drags in GDAL, curl and Kerberos, which would make the wheel
+  ten times larger).
+* The package is not on PyPI yet. The name `pyorbslam3` is free; a PyPI-grade
+  `manylinux` wheel would need a statically linked minimal OpenCV in the
+  dependency superbuild. The source distribution could be uploaded as it stands,
+  which would make `pip install pyorbslam3` compile from source.
+* While this repository is private the release URL above works only for
+  accounts with access.
+
 ### Vocabulary
 
 The 139 MB ORB vocabulary is not part of the package. `pyorbslam3.vocabulary_path()`
 returns a local copy, downloading `ORBvoc.txt.tar.gz` from the ORB-SLAM3
 repository once into `~/.cache/pyorbslam3/` (override the location with
 `PYORBSLAM3_CACHE`, or point `PYORBSLAM3_VOCAB` at an existing file).
+
+### Build and runtime environment variables
+
+| Variable | Effect |
+|---|---|
+| `ORBSLAM3_ROOT` | Use this prebuilt ORB-SLAM3 tree instead of compiling one (`<root>/build/libORB_SLAM3.a`); pair with `CMAKE_ARGS="-DPangolin_DIR=…"` if Pangolin is not on the default search path |
+| `PYORBSLAM3_JOBS` | Parallel compile jobs for the dependency build (default 2; each ORB-SLAM3 job can need ~2 GB RAM) |
+| `PYORBSLAM3_VOCAB` | Path to an existing `ORBvoc.txt`; skips the download |
+| `PYORBSLAM3_CACHE` | Directory for the downloaded vocabulary (default `~/.cache/pyorbslam3`) |
 
 ### Docker
 
@@ -99,9 +129,10 @@ docker run --rm -it -v /path/to/datasets:/data pyorbslam3 bash
 python3 examples/benchmark.py --dataset tumvi --root /data/dataset-room1_512_16 --mode stereo-imu
 ```
 
-The image is Ubuntu 22.04 with Python 3.10 and contains the bindings, the ORB
-vocabulary (`$PYORBSLAM3_VOCAB`), the dataset configs and the example scripts;
-it weighs about 1 GB. `JOBS` (default 3) caps build parallelism for the same
+The image is Ubuntu 22.04 with Python 3.10 and contains the bindings (installed
+with the same `pip install .` path as above, against the ORB-SLAM3 tree compiled
+in the builder stage), the ORB vocabulary (`$PYORBSLAM3_VOCAB`), the dataset
+configs and the example scripts; it weighs about 1 GB. `JOBS` (default 3) caps build parallelism for the same
 reason as above: use `--build-arg JOBS=2` on an 8 GB machine.
 
 To use your own code against the image, mount it and import `pyorbslam3`:
@@ -121,8 +152,10 @@ docker push <user>/pyorbslam3:0.1.0 && docker push <user>/pyorbslam3:latest
 ### Building in place (development)
 
 `./build.sh [-DORBSLAM3_ROOT=…]` runs the same CMake project without pip and
-drops `_core*.so` into `pyorbslam3/`, so `pip install -e .` or a plain
-`PYTHONPATH` checkout works while editing the C++ source.
+drops `_core*.so` into `pyorbslam3/`, so a plain `PYTHONPATH` checkout works
+while editing the C++ source. There is no `setup.py`; `pyproject.toml`
+(scikit-build-core) is the single build definition for pip, the wheel and the
+Docker image.
 
 ## Usage
 
