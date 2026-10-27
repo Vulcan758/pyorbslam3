@@ -3,9 +3,10 @@
 Python bindings for [ORB-SLAM3](https://github.com/UZ-SLAMLab/ORB_SLAM3) built
 for production use: every sensor mode (monocular, stereo, RGB-D, each with or
 without an IMU), explicit tracking state on every frame, the GIL released while
-ORB-SLAM3 works, and errors raised as Python exceptions. A self-contained Docker
-image is provided, and the bindings are benchmarked on TUM-VI, EuRoC, KITTI and
-TUM RGB-D ([BENCHMARKS.md](BENCHMARKS.md)).
+ORB-SLAM3 works, and errors raised as Python exceptions. `pip install pyorbslam3`
+gives you prebuilt Linux wheels; a self-contained Docker image is provided too,
+and the bindings are benchmarked on TUM-VI, EuRoC, KITTI and TUM RGB-D
+([BENCHMARKS.md](BENCHMARKS.md)).
 
 They are the SLAM core of the [`orbulation`](https://github.com/Vulcan758/orbulation)
 ROS 2 package, which runs them live on a ZED 2i and an Intel RealSense D435i.
@@ -47,7 +48,7 @@ and the knobs that apply to every method come after the four.
 
 | # | Method | Time | Needs | Verified by |
 |---|---|---|---|---|
-| 1 | `pip install pyorbslam3` — manylinux wheel from PyPI (or from the [GitHub release](https://github.com/Vulcan758/pyorbslam3/releases)) | seconds | x86-64 Linux with glibc ≥ 2.28, Python 3.9–3.13 | wheel built in the manylinux_2_28 container, import + stereo-inertial run on a different distribution |
+| 1 | `pip install pyorbslam3` — manylinux wheel from [PyPI](https://pypi.org/project/pyorbslam3/) | seconds | x86-64 Linux with glibc ≥ 2.28, Python 3.9–3.13 | PyPI install on a fresh Debian 13 image, import + inertial run, scale 0.995 |
 | 2 | `pip install git+https://github.com/Vulcan758/pyorbslam3` (compiles everything) | 20–60 min | the apt build packages listed below | clean-checkout build, TUM-VI mono-inertial run, scale 1.006 |
 | 3 | `ORBSLAM3_ROOT=/path pip install .` (reuse an ORB-SLAM3 you built) | ~2 min | a static `-fPIC` ORB-SLAM3 build + Pangolin | same wheel contents as method 2 |
 | 4 | Docker image (`docker build -t pyorbslam3 .`) | 30–60 min | Docker | stereo-inertial run inside the container, scale 1.009 |
@@ -73,9 +74,11 @@ apt install libgl1 libegl1 libopengl0 libsm6 \     dnf install mesa-libGL mesa-l
     libice6 libx11-6 libxext6                            libSM libICE libX11 libXext
 ```
 
-Verified on `python:3.10-slim` (Debian 13, glibc 2.41) with `opencv-python`
-installed alongside. The same wheels are attached to each GitHub release, which
-is the place to get them while the package is not yet on PyPI:
+Verified by installing from PyPI on `python:3.12-slim` (Debian 13, glibc 2.41)
+with `opencv-python` alongside: import, vocabulary auto-download, mono-inertial
+run with scale 0.995. The same wheels and the sdist are attached to each
+[GitHub release](https://github.com/Vulcan758/pyorbslam3/releases) if you need
+them without PyPI:
 
 ```bash
 pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.1/pyorbslam3-0.1.1-cp310-cp310-manylinux_2_28_x86_64.whl
@@ -83,7 +86,9 @@ pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.1/pyo
 
 Limits of this method:
 
-* Linux x86-64 only (no macOS, Windows, ARM, musl). Other platforms: method 2.
+* Linux x86-64 only (no macOS, Windows, ARM, musl). On any other platform
+  `pip install pyorbslam3` falls back to the sdist and compiles (method 2), so
+  the apt build packages listed there are needed.
 * The bundled OpenCV is private to the module (hidden symbols); it does not
   conflict with, and is not shared with, `opencv-python`'s `cv2`.
 * The Pangolin viewer in the wheel is X11-only (`use_viewer=True` needs an X
