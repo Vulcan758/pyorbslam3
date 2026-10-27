@@ -191,7 +191,14 @@ GitHub repository settings. After that:
 ```bash
 # bump version in pyproject.toml, commit, then
 git tag -a v0.1.2 -m "pyorbslam3 0.1.2" && git push origin main --tags
+# if no run appears under Actions within a minute, start it on the tag by hand:
+gh workflow run wheels.yml --ref v0.1.2
 ```
+
+The run takes about an hour (OpenCV, Pangolin and ORB-SLAM3 compile once,
+then one wheel per Python version). If the `pypi` job fails because the
+trusted publisher is not configured yet, configure it and re-run just that
+job from the Actions page; the built artifacts are kept.
 
 Building the wheels locally (Docker required, ~1 h at 3 jobs):
 
