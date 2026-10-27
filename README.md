@@ -318,6 +318,16 @@ docker/patches/            ORB-SLAM3 patches applied in the Docker build
 Dockerfile                 self-contained image
 ```
 
+## License
+
+GPL-3.0-or-later (see [LICENSE](LICENSE)). The license is dictated by ORB-SLAM3,
+which is GPLv3 and is statically linked into every wheel; the bindings
+themselves carry the same license. [NOTICE](NOTICE) lists every third-party
+component that ends up in a wheel and its license (Pangolin MIT, OpenCV
+Apache-2.0, Eigen MPL-2.0, Boost BSL-1.0, DBoW2/g2o BSD, Sophus MIT, pybind11
+BSD). Practically: you can use pyorbslam3 freely in your own code, but anything
+you distribute that contains it must be offered under GPLv3-compatible terms.
+
 ## Acknowledgements
 
 ORB-SLAM3 is by Campos, Elvira, Rodríguez, Montiel and Tardós (GPLv3). The CMake

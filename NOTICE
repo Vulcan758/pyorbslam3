@@ -1,0 +1,32 @@
+pyorbslam3 — Python bindings for ORB-SLAM3
+Copyright (C) 2026 Al Mahir Ahmed
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See LICENSE for the full text.
+
+Why GPLv3: the binary wheels statically link ORB-SLAM3, which is GPLv3, so the
+distributed package is a GPLv3 work. The binding source in src/ and the Python
+package in pyorbslam3/ are released under the same license to keep things simple.
+
+Third-party components compiled into the wheels (or fetched and compiled by a
+source install), with their licenses:
+
+  ORB-SLAM3        GPL-3.0        https://github.com/UZ-SLAMLab/ORB_SLAM3
+                                  (commit 4452a3c4, plus docker/patches/)
+  DBoW2 (modified, bundled in ORB-SLAM3)   BSD-3-Clause
+  g2o   (modified, bundled in ORB-SLAM3)   BSD-2-Clause (core); see Thirdparty/g2o/license-bsd.txt
+  Sophus (bundled in ORB-SLAM3)            MIT
+  Pangolin 0.9     MIT            https://github.com/stevenlovegrove/Pangolin
+  OpenCV 4.10      Apache-2.0     https://github.com/opencv/opencv   (static, minimal module set)
+  Eigen 3.4        MPL-2.0        https://eigen.tuxfamily.org
+  Boost.Serialization   BSL-1.0   https://www.boost.org             (shared, bundled by auditwheel)
+  OpenSSL 1.1      Apache-2.0 / OpenSSL license                     (shared, bundled by auditwheel)
+  GLEW, GLU        BSD / MIT, SGI Free Software License B           (shared, bundled by auditwheel)
+  pybind11         BSD-3-Clause   https://github.com/pybind/pybind11
+  CMake modernization patch for ORB-SLAM3 (docker/patches/0001-*):
+                   MIT, from PRBonn's ORB-SLAM-Python project
+
+The ORB vocabulary (ORBvoc.txt) is downloaded at runtime from the ORB-SLAM3
+repository and is not part of this package.
