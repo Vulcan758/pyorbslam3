@@ -45,36 +45,49 @@ There are **four independent ways** to get `pyorbslam3`. Pick **one**; they all
 end with the same `import pyorbslam3`. The common follow-up (the ORB vocabulary)
 and the knobs that apply to every method come after the four.
 
-| # | Method | Time | Needs | Verified on 2026-10-24 by |
+| # | Method | Time | Needs | Verified by |
 |---|---|---|---|---|
-| 1 | Prebuilt wheel from the [release](https://github.com/Vulcan758/pyorbslam3/releases/tag/v0.1.0) | seconds | Ubuntu 22.04, Python 3.10, x86-64, `python3-opencv` | pristine Ubuntu 22.04 container, stereo-inertial run, scale 1.011 |
+| 1 | `pip install pyorbslam3` — manylinux wheel from PyPI (or from the [GitHub release](https://github.com/Vulcan758/pyorbslam3/releases)) | seconds | x86-64 Linux with glibc ≥ 2.28, Python 3.9–3.13 | wheel built in the manylinux_2_28 container, import + stereo-inertial run on a different distribution |
 | 2 | `pip install git+https://github.com/Vulcan758/pyorbslam3` (compiles everything) | 20–60 min | the apt build packages listed below | clean-checkout build, TUM-VI mono-inertial run, scale 1.006 |
 | 3 | `ORBSLAM3_ROOT=/path pip install .` (reuse an ORB-SLAM3 you built) | ~2 min | a static `-fPIC` ORB-SLAM3 build + Pangolin | same wheel contents as method 2 |
 | 4 | Docker image (`docker build -t pyorbslam3 .`) | 30–60 min | Docker | stereo-inertial run inside the container, scale 1.009 |
 
-### Method 1 — prebuilt wheel (Ubuntu 22.04, Python 3.10, x86-64)
-
-A wheel built against Ubuntu 22.04's OpenCV is attached to each GitHub release.
-It bundles Boost, GLEW, OpenSSL and the Wayland client libraries and needs only
-the distribution's OpenCV and GL runtime:
+### Method 1 — `pip install pyorbslam3` (prebuilt manylinux wheel)
 
 ```bash
-sudo apt install python3-opencv libgl1 libglx0 libopengl0 libegl1
-pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.0/pyorbslam3-0.1.0-cp310-cp310-manylinux_2_34_x86_64.manylinux_2_35_x86_64.whl
+pip install pyorbslam3
+```
+
+The wheels on PyPI are `manylinux_2_28` builds for x86-64 Linux and CPython
+3.9–3.13. Each one carries ORB-SLAM3, Pangolin, a static minimal OpenCV
+(core, imgproc, imgcodecs, features2d, calib3d, highgui), Boost.Serialization,
+OpenSSL, GLU and GLEW inside the wheel, so the host needs nothing beyond
+glibc ≥ 2.28 and the OpenGL/X11 runtime libraries that every desktop Linux
+already has (`libOpenGL.so.0`, `libGLX.so.0`, `libEGL.so.1`, `libX11.so.6`,
+`libXext.so.6`, `libSM.so.6`, `libICE.so.6`). On a minimal server or container
+image install them first:
+
+```bash
+# Debian / Ubuntu                                   # Fedora / RHEL
+apt install libgl1 libegl1 libopengl0 libsm6 \     dnf install mesa-libGL mesa-libEGL libglvnd-opengl \
+    libice6 libx11-6 libxext6                            libSM libICE libX11 libXext
+```
+
+Verified on `python:3.10-slim` (Debian 13, glibc 2.41) with `opencv-python`
+installed alongside. The same wheels are attached to each GitHub release, which
+is the place to get them while the package is not yet on PyPI:
+
+```bash
+pip install https://github.com/Vulcan758/pyorbslam3/releases/download/v0.1.1/pyorbslam3-0.1.1-cp310-cp310-manylinux_2_28_x86_64.whl
 ```
 
 Limits of this method:
 
-* Ubuntu 22.04 / Python 3.10 / x86-64 only, because the wheel links the
-  distribution's OpenCV 4.5.4 shared libraries rather than bundling OpenCV
-  (Ubuntu's OpenCV drags in GDAL, curl and Kerberos, which would make the wheel
-  ten times larger). Any other Python version or distribution: use method 2.
-* The package is not on PyPI yet. The name `pyorbslam3` is free; a PyPI-grade
-  `manylinux` wheel would need a statically linked minimal OpenCV in the
-  dependency superbuild. The source distribution could be uploaded as it stands,
-  which would make `pip install pyorbslam3` behave like method 2.
-* While this repository is private the release URL works only for accounts
-  with access.
+* Linux x86-64 only (no macOS, Windows, ARM, musl). Other platforms: method 2.
+* The bundled OpenCV is private to the module (hidden symbols); it does not
+  conflict with, and is not shared with, `opencv-python`'s `cv2`.
+* The Pangolin viewer in the wheel is X11-only (`use_viewer=True` needs an X
+  server or XWayland).
 
 ### Method 2 — pip from source (compiles Pangolin and ORB-SLAM3 for you)
 
@@ -155,8 +168,39 @@ image already contains it.
 |---|---|
 | `ORBSLAM3_ROOT` | Method 3: use this prebuilt ORB-SLAM3 tree instead of compiling one (`<root>/build/libORB_SLAM3.a`) |
 | `PYORBSLAM3_JOBS` | Methods 2–3: parallel compile jobs (default 2; each ORB-SLAM3 job can need ~2 GB RAM) |
+| `PYORBSLAM3_SELF_CONTAINED` | Method 2: `1` also compiles a static OpenCV and Eigen into the dependency build instead of using the system ones (what the manylinux wheels do; adds ~15 min) |
+| `PYORBSLAM3_DEPS_DIR` | Method 2: directory for the dependency build (default `build/…/deps`); point it somewhere shared to reuse it across Python versions |
 | `PYORBSLAM3_VOCAB` | Runtime: path to an existing `ORBvoc.txt`; skips the download |
 | `PYORBSLAM3_CACHE` | Runtime: directory for the downloaded vocabulary (default `~/.cache/pyorbslam3`) |
+
+### Releasing (maintainers)
+
+Wheels and the sdist are built by `.github/workflows/wheels.yml` with
+cibuildwheel on every `v*` tag: five CPython versions in the `manylinux_2_28`
+container with `PYORBSLAM3_SELF_CONTAINED=1` (static OpenCV + Eigen + Boost
+compiled inside the superbuild), then `auditwheel` bundles the remaining shared
+libraries. The workflow attaches everything to the GitHub release and publishes
+to PyPI through [trusted publishing](https://docs.pypi.org/trusted-publishers/),
+so no API token is stored anywhere.
+
+One-time PyPI setup: log in to PyPI → *Your projects* → *Publishing* → add a
+pending publisher with owner `Vulcan758`, repository `pyorbslam3`, workflow
+`wheels.yml`, environment `pypi`; then create a `pypi` environment in the
+GitHub repository settings. After that:
+
+```bash
+# bump version in pyproject.toml, commit, then
+git tag -a v0.1.2 -m "pyorbslam3 0.1.2" && git push origin main --tags
+```
+
+Building the wheels locally (Docker required, ~1 h at 3 jobs):
+
+```bash
+pip install cibuildwheel
+CIBW_BUILD=cp310-manylinux_x86_64 \
+  CIBW_ENVIRONMENT="PYORBSLAM3_SELF_CONTAINED=1 PYORBSLAM3_DEPS_DIR=/tmp/pyorbslam3-deps PYORBSLAM3_JOBS=3" \
+  cibuildwheel --platform linux --output-dir wheelhouse
+```
 
 ### Developing the bindings (not an install method)
 

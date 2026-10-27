@@ -1,0 +1,48 @@
+name: wheels
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install build && python -m build --sdist
+      - uses: actions/upload-artifact@v4
+        with: { name: sdist, path: dist/*.tar.gz }
+
+  wheels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/cibuildwheel@v2.22.0
+      - uses: actions/upload-artifact@v4
+        with: { name: wheels, path: wheelhouse/*.whl }
+
+  github-release:
+    needs: [sdist, wheels]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with: { files: dist/* }
+
+  pypi:
+    needs: [sdist, wheels]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions: { id-token: write }   # PyPI trusted publishing (no token stored)
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: pypa/gh-action-pypi-publish@release/v1

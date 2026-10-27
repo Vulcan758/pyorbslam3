@@ -25,12 +25,28 @@ set(ORBSLAM_DEPS
     "${CMAKE_CURRENT_SOURCE_DIR}/../ORB-SLAM-Python/build/cp310-cp310-linux_x86_64/_deps"
     CACHE PATH "Legacy: _deps dir of an ORB-SLAM-Python build")
 option(PYORBSLAM3_FETCH_DEPS "Download and build Pangolin + ORB-SLAM3" OFF)
-if(DEFINED ENV{PYORBSLAM3_JOBS})
+# Self-contained: also build a static minimal OpenCV and Eigen, so the module
+# does not depend on the system OpenCV (used for the manylinux wheels).
+if(DEFINED ENV{PYORBSLAM3_SELF_CONTAINED} AND NOT "$ENV{PYORBSLAM3_SELF_CONTAINED}" STREQUAL "" AND NOT "$ENV{PYORBSLAM3_SELF_CONTAINED}" STREQUAL "0")
+  set(_default_self_contained ON)
+else()
+  set(_default_self_contained OFF)
+endif()
+option(PYORBSLAM3_SELF_CONTAINED "Bundle OpenCV + Eigen in the dependency build" ${_default_self_contained})
+if(PYORBSLAM3_SELF_CONTAINED)
+  set(PYORBSLAM3_FETCH_DEPS ON)
+endif()
+# Where the dependency build lives (shared between Python versions in CI).
+set(PYORBSLAM3_DEPS_DIR "$ENV{PYORBSLAM3_DEPS_DIR}" CACHE PATH "Directory for the dependency superbuild")
+if(DEFINED ENV{PYORBSLAM3_JOBS} AND NOT "$ENV{PYORBSLAM3_JOBS}" STREQUAL "")
   set(_default_jobs "$ENV{PYORBSLAM3_JOBS}")
 else()
   set(_default_jobs 2)
 endif()
 set(PYORBSLAM3_JOBS "${_default_jobs}" CACHE STRING "Parallel jobs for the dependency build")
+if(PYORBSLAM3_JOBS STREQUAL "")
+  set(PYORBSLAM3_JOBS 2)
+endif()
 
 if(ORBSLAM3_ROOT STREQUAL "" AND NOT PYORBSLAM3_FETCH_DEPS
    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ORB_SLAM3/build/libORB_SLAM3.a")
@@ -42,12 +58,21 @@ if(ORBSLAM3_ROOT STREQUAL "" AND NOT PYORBSLAM3_FETCH_DEPS
 endif()
 
 if(PYORBSLAM3_FETCH_DEPS)
-  set(_deps "${CMAKE_BINARY_DIR}/deps")
+  if(PYORBSLAM3_DEPS_DIR STREQUAL "")
+    set(_deps "${CMAKE_BINARY_DIR}/deps")
+  else()
+    set(_deps "${PYORBSLAM3_DEPS_DIR}")
+  endif()
   message(STATUS "pyorbslam3: building Pangolin + ORB-SLAM3 from source in ${_deps} "
-                 "(jobs=${PYORBSLAM3_JOBS}; this takes a while)")
+                 "(jobs=${PYORBSLAM3_JOBS}, self-contained=${PYORBSLAM3_SELF_CONTAINED}; this takes a while)")
+  # Generator, make program and compilers are passed explicitly so that a
+  # dependency build cached from an earlier pip run (whose temporary build
+  # environment is gone) is refreshed instead of pointing at stale paths.
   execute_process(
     COMMAND ${CMAKE_COMMAND} -S "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps" -B "${_deps}"
-            -DJOBS=${PYORBSLAM3_JOBS}
+            -G "${CMAKE_GENERATOR}" "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+            "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}" "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            -DJOBS=${PYORBSLAM3_JOBS} -DSELF_CONTAINED=${PYORBSLAM3_SELF_CONTAINED}
     RESULT_VARIABLE _rc)
   if(NOT _rc EQUAL 0)
     message(FATAL_ERROR "configuring the dependency superbuild failed")
@@ -59,19 +84,30 @@ if(PYORBSLAM3_FETCH_DEPS)
   set(ORBSLAM3_ROOT "${_deps}/orbslam3-src")
   set(ORBSLAM3_BUILD_DIR "${_deps}/orbslam3-build")
   set(Pangolin_DIR "${_deps}/pangolin-install/lib/cmake/Pangolin" CACHE PATH "" FORCE)
+  if(PYORBSLAM3_SELF_CONTAINED)
+    # prepend so the bundled OpenCV/Eigen win over any system copies
+    list(PREPEND CMAKE_PREFIX_PATH "${_deps}/opencv-install" "${_deps}/eigen-install")
+  endif()
 endif()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 find_package(OpenCV 4.4 REQUIRED)
 find_package(Eigen3 REQUIRED)
+# Boost.Serialization is linked shared on purpose: distribution static builds
+# are usually not -fPIC (manylinux's is not), and auditwheel bundles the .so.
 find_package(Boost REQUIRED COMPONENTS serialization)
 find_package(OpenSSL REQUIRED)
 
 pybind11_add_module(_core MODULE src/orbslam3_pybind.cpp)
 
+if(PYORBSLAM3_SELF_CONTAINED)
+  set(_win_uri "x11")   # manylinux builds have no Wayland
+else()
+  set(_win_uri "wayland")
+endif()
 target_compile_definitions(
-  _core PRIVATE HAVE_GLEW HAVE_EIGEN _LINUX_ PANGO_DEFAULT_WIN_URI="wayland"
+  _core PRIVATE HAVE_GLEW HAVE_EIGEN _LINUX_ PANGO_DEFAULT_WIN_URI="${_win_uri}"
                 BOOST_ALL_NO_LIB BOOST_SERIALIZATION_DYN_LINK)
 
 if(NOT ORBSLAM3_ROOT STREQUAL "")

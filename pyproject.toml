@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyorbslam3"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python bindings for ORB-SLAM3: monocular, stereo, RGB-D, with and without IMU"
 readme = "README.md"
 license = { text = "GPL-3.0-only" }
@@ -30,3 +30,27 @@ logging.level = "INFO"
 build-dir = "build/pip-{wheel_tag}"
 wheel.packages = ["pyorbslam3"]
 sdist.exclude = ["build/", "results/", "vocabulary/", "*.so", "__pycache__/"]
+
+# ---------------------------------------------------------------------------
+# manylinux wheels (cibuildwheel). Each wheel bundles ORB-SLAM3, Pangolin, a
+# static minimal OpenCV and Boost; the host only needs libGL/libX11.
+#   PYORBSLAM3_JOBS=4 cibuildwheel --platform linux
+# ---------------------------------------------------------------------------
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *_i686 pp*"
+build-verbosity = 1
+test-command = "python -c \"import pyorbslam3, numpy; print(pyorbslam3.Sensor.IMU_STEREO)\""
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+before-all = """
+dnf install -y --enablerepo=powertools boost-devel boost-static openssl-devel \
+    mesa-libGL-devel mesa-libEGL-devel mesa-libGLU-devel libX11-devel libXext-devel glew-devel patch
+"""
+# Override for local runs with less RAM, e.g.
+#   CIBW_ENVIRONMENT="PYORBSLAM3_SELF_CONTAINED=1 PYORBSLAM3_DEPS_DIR=/tmp/pyorbslam3-deps PYORBSLAM3_JOBS=3"
+environment = { PYORBSLAM3_SELF_CONTAINED = "1", PYORBSLAM3_DEPS_DIR = "/tmp/pyorbslam3-deps", PYORBSLAM3_JOBS = "4" }
+# GL dispatch libraries must come from the host's driver stack, never the wheel.
+repair-wheel-command = "auditwheel repair --exclude libEGL.so.1 --exclude libOpenGL.so.0 --exclude libGLX.so.0 --exclude libGLdispatch.so.0 -w {dest_dir} {wheel}"
