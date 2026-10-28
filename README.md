@@ -37,8 +37,14 @@ ROS 2 package, which runs them live on a ZED 2i and an Intel RealSense D435i.
   reset, and trajectory export in TUM, EuRoC and KITTI formats.
 * **Known upstream crashes are handled.** `System::GetTimeFromIMUInit()` reads an
   uninitialized pointer until the first keyframe exists; the binding guards the
-  call. The Docker build also carries a small defensive patch for a race in
-  `LocalMapping::KeyFrameCulling()` that could segfault long inertial runs.
+  call. Every build (pip, wheels, Docker) also applies patches in
+  `docker/patches/`:
+  - a defensive patch for a race in `LocalMapping::KeyFrameCulling()` that
+    could segfault long inertial runs;
+  - fixes for three out-of-bounds reads that intermittently segfault stereo
+    and stereo-inertial with fisheye (KannalaBrandt8) cameras such as TUM-VI.
+    The fixes are in `FrameDrawer::Update()`,
+    `LocalMapping::CreateNewMapPoints()` and `LocalMapping::KeyFrameCulling()`.
 
 ## Installation
 
@@ -107,7 +113,7 @@ pip install git+https://github.com/Vulcan758/pyorbslam3      # or: pip install .
 ```
 
 pip downloads and compiles Pangolin 0.9 and ORB-SLAM3 (pinned commit plus the
-two patches in `docker/patches/`) before building the bindings, which is why the
+patches in `docker/patches/`) before building the bindings, which is why the
 first install takes 20–60 minutes. Two parallel compile jobs are used by default
 because some ORB-SLAM3 files need about 2 GB of RAM each; raise it with
 `PYORBSLAM3_JOBS=4 pip install …` on a machine with memory to spare. CMake ≥ 3.25
@@ -195,9 +201,9 @@ GitHub repository settings. After that:
 
 ```bash
 # bump version in pyproject.toml, commit, then
-git tag -a v0.1.2 -m "pyorbslam3 0.1.2" && git push origin main --tags
+git tag -a v0.1.3 -m "pyorbslam3 0.1.3" && git push origin main --tags
 # if no run appears under Actions within a minute, start it on the tag by hand:
-gh workflow run wheels.yml --ref v0.1.2
+gh workflow run wheels.yml --ref v0.1.3
 ```
 
 The run takes about an hour (OpenCV, Pangolin and ORB-SLAM3 compile once,

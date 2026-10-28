@@ -1,0 +1,47 @@
+FrameDrawer::Update: fix out-of-bounds keypoint reads with fisheye stereo.
+
+For KannalaBrandt8 stereo, Tracking sets FrameDrawer::both, so N counts left
++ right keypoints, but the matched-point loop indexed the left-only
+mvCurrentKeys up to N. Every right-camera map point read past the end of the
+vector; it runs on every frame (with or without the viewer) and segfaults
+intermittently depending on heap layout. Index the right keypoints for
+i >= nLeft and bound the loop by mvpMapPoints.size().
+
+--- a/src/FrameDrawer.cc
++++ b/src/FrameDrawer.cc
+@@ -410,11 +410,19 @@
+     }
+     else if(pTracker->mLastProcessedState==Tracking::OK)
+     {
+-        for(int i=0;i<N;i++)
++        // With two cameras (fisheye stereo) N counts left + right keypoints but
++        // mvCurrentKeys holds only the left ones: index the right keys for i >= nLeft.
++        const int nLeft = static_cast<int>(mvCurrentKeys.size());
++        const int nRight = both ? static_cast<int>(mvCurrentKeysRight.size()) : 0;
++        const int nPoints = std::min<int>(N, pTracker->mCurrentFrame.mvpMapPoints.size());
++        for(int i=0;i<nPoints;i++)
+         {
+             MapPoint* pMP = pTracker->mCurrentFrame.mvpMapPoints[i];
+             if(pMP)
+             {
++                if(i >= nLeft + nRight)
++                    continue;
++                const cv::KeyPoint &kp = (i < nLeft) ? mvCurrentKeys[i] : mvCurrentKeysRight[i - nLeft];
+                 if(!pTracker->mCurrentFrame.mvbOutlier[i])
+                 {
+                     if(pMP->Observations()>0)
+@@ -422,12 +430,12 @@
+                     else
+                         mvbVO[i]=true;
+ 
+-                    mmMatchedInImage[pMP->mnId] = mvCurrentKeys[i].pt;
++                    mmMatchedInImage[pMP->mnId] = kp.pt;
+                 }
+                 else
+                 {
+                     mvpOutlierMPs.push_back(pMP);
+-                    mvOutlierKeys.push_back(mvCurrentKeys[i]);
++                    mvOutlierKeys.push_back(kp);
+                 }
+             }
+         }

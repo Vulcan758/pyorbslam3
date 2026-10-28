@@ -1,6 +1,6 @@
 // pyorbslam3 — pybind11 bindings for ORB-SLAM3
 //
-// Design goals (vs. the PRBonn ORB-SLAM-Python bindings previously used here):
+// Design goals:
 //  * Working inertial AND non-inertial modes with a clearly documented IMU
 //    convention: rows of [t, gx, gy, gz, ax, ay, az]  (rad/s, m/s^2, seconds),
 //    i.e. the exact column order of EuRoC / TUM-VI imu0/data.csv.

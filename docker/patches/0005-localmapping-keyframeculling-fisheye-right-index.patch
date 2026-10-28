@@ -1,0 +1,25 @@
+--- a/src/LocalMapping.cc
++++ b/src/LocalMapping.cc
+@@ -962,16 +962,18 @@
+                 {
+                     if(!mbMonocular)
+                     {
+-                        if(pKF->mvDepth[i]>pKF->mThDepth || pKF->mvDepth[i]<0)
++                        // fisheye stereo: mvDepth holds left keypoints only; right ones have no depth
++                        if(i >= pKF->mvDepth.size() || pKF->mvDepth[i]>pKF->mThDepth || pKF->mvDepth[i]<0)
+                             continue;
+                     }
+ 
+                     nMPs++;
+                     if(pMP->Observations()>thObs)
+                     {
+-                        const int &scaleLevel = (pKF -> NLeft == -1) ? pKF->mvKeysUn[i].octave
+-                                                                     : (i < pKF -> NLeft) ? pKF -> mvKeys[i].octave
+-                                                                                          : pKF -> mvKeysRight[i].octave;
++                        // right keypoints follow the left ones: index mvKeysRight with i - NLeft
++                        const int scaleLevel = (pKF -> NLeft == -1) ? pKF->mvKeysUn[i].octave
++                                                                    : (i < static_cast<size_t>(pKF -> NLeft)) ? pKF -> mvKeys[i].octave
++                                                                                                              : pKF -> mvKeysRight[i - pKF -> NLeft].octave;
+                         const map<KeyFrame*, tuple<int,int>> observations = pMP->GetObservations();
+                         int nObs=0;
+                         for(map<KeyFrame*, tuple<int,int>>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)

@@ -97,6 +97,9 @@ ExternalProject_Add(orbslam3
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/orbslam3-build"
   PATCH_COMMAND patch -p1 -N -i "${PATCH_DIR}/0001-cmake-static-pic-modern-targets.patch"
         COMMAND patch -p1 -N -i "${PATCH_DIR}/0002-localmapping-keyframeculling-guards.patch"
+        COMMAND patch -p1 -N -i "${PATCH_DIR}/0003-framedrawer-fisheye-stereo-bounds.patch"
+        COMMAND patch -p1 -N -i "${PATCH_DIR}/0004-localmapping-fisheye-uright-bounds.patch"
+        COMMAND patch -p1 -N -i "${PATCH_DIR}/0005-localmapping-keyframeculling-fisheye-right-index.patch"
   LIST_SEPARATOR |
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
              -DPangolin_DIR=${PANGOLIN_PREFIX}/lib/cmake/Pangolin

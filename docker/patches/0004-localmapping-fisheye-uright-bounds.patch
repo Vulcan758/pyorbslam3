@@ -1,0 +1,34 @@
+LocalMapping::CreateNewMapPoints: bound mvuRight reads for fisheye stereo.
+
+Fisheye (KannalaBrandt8) stereo frames size mvuRight by the left keypoints
+only, but triangulation matches can carry right-camera indices (>= NLeft).
+The unconditional mvuRight[idx] reads went past the end of the vector and
+intermittently segfaulted the LocalMapping thread in stereo-inertial runs.
+The value only matters without a second camera (bStereo = !mpCamera2 && ...),
+so reading -1 for out-of-range indices changes no behaviour. Applies on top of
+0002.
+
+--- a/src/LocalMapping.cc
++++ b/src/LocalMapping.cc
+@@ -488,7 +488,10 @@
+             const cv::KeyPoint &kp1 = (mpCurrentKeyFrame -> NLeft == -1) ? mpCurrentKeyFrame->mvKeysUn[idx1]
+                                                                          : (idx1 < mpCurrentKeyFrame -> NLeft) ? mpCurrentKeyFrame -> mvKeys[idx1]
+                                                                                                                : mpCurrentKeyFrame -> mvKeysRight[idx1 - mpCurrentKeyFrame -> NLeft];
+-            const float kp1_ur=mpCurrentKeyFrame->mvuRight[idx1];
++            // Fisheye stereo frames size mvuRight by the left keypoints only, while idx1 may be a
++            // right-camera index; the value is only used when there is no second camera anyway.
++            const float kp1_ur = (idx1 < static_cast<int>(mpCurrentKeyFrame->mvuRight.size()))
++                                 ? mpCurrentKeyFrame->mvuRight[idx1] : -1.0f;
+             bool bStereo1 = (!mpCurrentKeyFrame->mpCamera2 && kp1_ur>=0);
+             const bool bRight1 = (mpCurrentKeyFrame -> NLeft == -1 || idx1 < mpCurrentKeyFrame -> NLeft) ? false
+                                                                                                          : true;
+@@ -497,7 +500,8 @@
+                                                             : (idx2 < pKF2 -> NLeft) ? pKF2 -> mvKeys[idx2]
+                                                                                      : pKF2 -> mvKeysRight[idx2 - pKF2 -> NLeft];
+ 
+-            const float kp2_ur = pKF2->mvuRight[idx2];
++            const float kp2_ur = (idx2 < static_cast<int>(pKF2->mvuRight.size()))
++                                 ? pKF2->mvuRight[idx2] : -1.0f;
+             bool bStereo2 = (!pKF2->mpCamera2 && kp2_ur>=0);
+             const bool bRight2 = (pKF2 -> NLeft == -1 || idx2 < pKF2 -> NLeft) ? false
+                                                                                : true;

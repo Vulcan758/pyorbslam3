@@ -46,6 +46,7 @@ RUN git init -q /opt/ORB_SLAM3 && cd /opt/ORB_SLAM3 \
     && git fetch -q --depth 1 origin ${ORBSLAM3_COMMIT} \
     && git checkout -q FETCH_HEAD \
     && git apply --whitespace=nowarn /tmp/patches/0001-*.patch /tmp/patches/0002-*.patch \
+        /tmp/patches/0003-*.patch /tmp/patches/0004-*.patch /tmp/patches/0005-*.patch \
     && rm -rf .git Examples_old Examples/*/TUM_IMU \
     && tar -xzf Vocabulary/ORBvoc.txt.tar.gz -C Vocabulary
 RUN cmake -S /opt/ORB_SLAM3 -B /opt/ORB_SLAM3/build -DCMAKE_BUILD_TYPE=Release \

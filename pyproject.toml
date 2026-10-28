@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyorbslam3"
-version = "0.1.2"
+version = "0.1.3"
 description = "Python bindings for ORB-SLAM3: monocular, stereo, RGB-D, with and without IMU"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
